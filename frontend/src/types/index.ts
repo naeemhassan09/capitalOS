@@ -445,6 +445,7 @@ export type LiquidityClass = 'immediate' | 'short_term' | 'restricted' | 'illiqu
 
 export interface Holding {
   id: string;
+  account_id: string | null;
   asset_name: string;
   ticker: string | null;
   asset_class: AssetClass;

@@ -9,6 +9,7 @@ Nothing here recomputes money — it only wires existing building blocks togethe
 
 from __future__ import annotations
 
+import logging
 import uuid
 from calendar import monthrange
 from datetime import date, timedelta
@@ -48,6 +49,8 @@ from app.services.views import (
 )
 
 # Jurisdictions surfaced with a dedicated cash breakdown on the dashboard.
+logger = logging.getLogger("capitalos.dashboard")
+
 JURISDICTIONS = ("IE", "PK")
 
 DEPLOYABLE_HORIZON_DAYS = 30
@@ -379,6 +382,27 @@ def build_dashboard(db: Session, user: User, as_of: date | None = None) -> dict:
                 ),
             }
         )
+
+    # ----------------------------------- warning: monthly budgets exceeded
+    try:
+        from app.services.budgets import build_budget_report
+
+        breport = build_budget_report(db, user, as_of.year, as_of.month)
+        for row in breport["rows"]:
+            if row["amount"] > 0 and row["actual_base"] > row["amount"]:
+                warnings.append(
+                    {
+                        "level": "warning",
+                        "code": "budget_exceeded",
+                        "message": (
+                            f"Budget exceeded: {row['category_name']} at "
+                            f"{_fmt_amount(row['actual_base'], base_currency)} of "
+                            f"{_fmt_amount(row['amount'], base_currency)} this month."
+                        ),
+                    }
+                )
+    except Exception:  # noqa: BLE001 - budgets must never break the dashboard
+        logger.exception("Budget warning computation failed")
 
     # -------------------------------- danger: negative deployable capital
     if deployable.total_base < 0:

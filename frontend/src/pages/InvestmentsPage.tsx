@@ -1,9 +1,19 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Plus, Pencil, Trash2, LineChart, TrendingUp, Info, RefreshCw } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  LineChart,
+  TrendingUp,
+  Info,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import {
   useHoldings,
   useCreateHolding,
@@ -12,6 +22,7 @@ import {
   useAddValuation,
   useSyncPrices,
 } from '@/api/holdings';
+import { useAccounts } from '@/api/accounts';
 import { useExchangeRates } from '@/api/exchangeRates';
 import { useDashboard } from '@/api/dashboard';
 import { useToast } from '@/hooks/useToast';
@@ -115,8 +126,11 @@ function makeConverter(rates: ExchangeRate[], base: Currency) {
   };
 }
 
+const OTHER_SECTION_KEY = '__other__';
+
 export function InvestmentsPage() {
   const holdings = useHoldings();
+  const accounts = useAccounts();
   const exchangeRates = useExchangeRates();
   const dashboard = useDashboard();
   const syncPrices = useSyncPrices();
@@ -125,6 +139,9 @@ export function InvestmentsPage() {
   const [editing, setEditing] = useState<Holding | null>(null);
   const [deleting, setDeleting] = useState<Holding | null>(null);
   const [valuing, setValuing] = useState<Holding | null>(null);
+  // Collapsed portfolio sections, keyed by account id (or OTHER_SECTION_KEY).
+  // Default: everything expanded; nothing persisted.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const rows = holdings.data ?? [];
   const colors = chartColors();
@@ -189,6 +206,35 @@ export function InvestmentsPage() {
     }
     return Array.from(map, ([name, value]) => ({ name, value })).filter((d) => num(d.value) > 0);
   }, [rows, convert]);
+
+  // Group holdings into portfolio sections by account_id. Sections follow the
+  // accounts list order; holdings with no / unknown account go to "Other
+  // holdings", always last.
+  const sections = useMemo(() => {
+    const accountList = accounts.data ?? [];
+    const byAccount = new Map<string, Holding[]>();
+    const other: Holding[] = [];
+    const knownIds = new Set(accountList.map((a) => a.id));
+    for (const h of rows) {
+      if (h.account_id && knownIds.has(h.account_id)) {
+        const list = byAccount.get(h.account_id);
+        if (list) list.push(h);
+        else byAccount.set(h.account_id, [h]);
+      } else {
+        other.push(h);
+      }
+    }
+    const result: { key: string; name: string; holdings: Holding[] }[] = [];
+    for (const a of accountList) {
+      const hs = byAccount.get(a.id);
+      if (hs?.length) result.push({ key: a.id, name: a.name, holdings: hs });
+    }
+    if (other.length) result.push({ key: OTHER_SECTION_KEY, name: 'Other holdings', holdings: other });
+    return result;
+  }, [rows, accounts.data]);
+
+  const toggleSection = (key: string) =>
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <div className="space-y-6">
@@ -280,85 +326,180 @@ export function InvestmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 ? (
+                {sections.length === 0 ? (
                   <TableEmpty colSpan={8}>No holdings.</TableEmpty>
                 ) : (
-                  rows.map((h) => {
-                    const gl = gainLoss(h);
+                  sections.map((section) => {
+                    const isCollapsed = !!collapsed[section.key];
+                    // Section subtotals: native shown only when every holding
+                    // shares one currency; base subtotal uses the page's
+                    // converter (skipping unconvertible amounts, like totals).
+                    const currencies = new Set(section.holdings.map((h) => h.native_currency));
+                    const uniformCurrency =
+                      currencies.size === 1 ? section.holdings[0].native_currency : null;
+                    let nativeValue = 0;
+                    let baseValue = 0;
+                    let gainNative = 0;
+                    let gainBase = 0;
+                    for (const h of section.holdings) {
+                      const nv = num(h.latest_valuation ?? h.cost_basis);
+                      nativeValue += nv;
+                      const v = convert(nv, h.native_currency);
+                      if (v.ok) baseValue += v.value;
+                      if (h.latest_valuation != null && h.cost_basis != null) {
+                        const g = num(h.latest_valuation) - num(h.cost_basis);
+                        gainNative += g;
+                        const gc = convert(g, h.native_currency);
+                        if (gc.ok) gainBase += gc.value;
+                      }
+                    }
+                    const gain = uniformCurrency ? gainNative : gainBase;
+                    const gainCurrency = uniformCurrency ?? baseCurrency;
                     return (
-                      <TableRow key={h.id}>
-                        <TableCell>
-                          <div className="min-w-[140px]">
-                            <p className="font-medium text-foreground">{h.asset_name}</p>
-                            {h.ticker && <p className="text-xs text-muted-foreground">{h.ticker}</p>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{ASSET_CLASS_LABELS[h.asset_class]}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{num(h.quantity)}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatMoney(h.cost_basis, h.native_currency)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {h.latest_valuation != null ? (
-                            <span title={h.valuation_date ? `As of ${formatDate(h.valuation_date)}` : undefined}>
-                              {formatMoney(h.latest_valuation, h.native_currency)}
-                              {h.valuation_is_manual === false && (
-                                <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                  auto
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell
-                          className={
-                            gl < 0
-                              ? 'text-right font-medium tabular-nums text-negative'
-                              : 'text-right font-medium tabular-nums text-positive'
-                          }
+                      <Fragment key={section.key}>
+                        <TableRow
+                          data-portfolio-section={section.key}
+                          aria-expanded={!isCollapsed}
+                          className="cursor-pointer bg-muted/40 hover:bg-muted/60"
+                          onClick={() => toggleSection(section.key)}
                         >
-                          {formatMoney(gl, h.native_currency, { signDisplay: 'always' })}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={h.liquidity_class === 'illiquid' ? 'illiquid' : 'invested'}>
-                            {LIQUIDITY_LABELS[h.liquidity_class]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => setValuing(h)} title="Add valuation">
-                              <TrendingUp className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setEditing(h);
-                                setFormOpen(true);
-                              }}
-                              aria-label="Edit"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-danger"
-                              onClick={() => setDeleting(h)}
-                              aria-label="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          <TableCell colSpan={8} className="py-2">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span className="flex items-center gap-2 font-semibold text-foreground">
+                                {isCollapsed ? (
+                                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                )}
+                                {section.name}
+                                <Badge variant="secondary">
+                                  {section.holdings.length}{' '}
+                                  {section.holdings.length === 1 ? 'holding' : 'holdings'}
+                                </Badge>
+                              </span>
+                              <span className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1 tabular-nums">
+                                {uniformCurrency && (
+                                  <span className="font-medium text-foreground">
+                                    {formatMoney(nativeValue, uniformCurrency)}
+                                  </span>
+                                )}
+                                {uniformCurrency !== baseCurrency && (
+                                  <span className="text-muted-foreground">
+                                    ≈ {formatMoney(baseValue, baseCurrency)}
+                                  </span>
+                                )}
+                                <span
+                                  className={
+                                    gain < 0 ? 'font-medium text-negative' : 'font-medium text-positive'
+                                  }
+                                >
+                                  {formatMoney(gain, gainCurrency, { signDisplay: 'always' })}
+                                </span>
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {!isCollapsed &&
+                          section.holdings.map((h) => {
+                            const gl = gainLoss(h);
+                            return (
+                              <TableRow key={h.id} data-holding-row={section.key}>
+                                <TableCell>
+                                  <div className="min-w-[140px] pl-6">
+                                    <p className="font-medium text-foreground">{h.asset_name}</p>
+                                    {h.ticker && <p className="text-xs text-muted-foreground">{h.ticker}</p>}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{ASSET_CLASS_LABELS[h.asset_class]}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">{num(h.quantity)}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {formatMoney(h.cost_basis, h.native_currency)}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {h.latest_valuation != null ? (
+                                    <span title={h.valuation_date ? `As of ${formatDate(h.valuation_date)}` : undefined}>
+                                      {formatMoney(h.latest_valuation, h.native_currency)}
+                                      {h.valuation_is_manual === false && (
+                                        <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                          auto
+                                        </span>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell
+                                  className={
+                                    gl < 0
+                                      ? 'text-right font-medium tabular-nums text-negative'
+                                      : 'text-right font-medium tabular-nums text-positive'
+                                  }
+                                >
+                                  {formatMoney(gl, h.native_currency, { signDisplay: 'always' })}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={h.liquidity_class === 'illiquid' ? 'illiquid' : 'invested'}>
+                                    {LIQUIDITY_LABELS[h.liquidity_class]}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex justify-end gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => setValuing(h)} title="Add valuation">
+                                      <TrendingUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => {
+                                        setEditing(h);
+                                        setFormOpen(true);
+                                      }}
+                                      aria-label="Edit"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-danger"
+                                      onClick={() => setDeleting(h)}
+                                      aria-label="Delete"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </Fragment>
                     );
                   })
+                )}
+                {sections.length > 0 && (
+                  <TableRow className="border-t-2 border-border bg-muted/50 font-semibold hover:bg-muted/50">
+                    <TableCell colSpan={3}>Total ({baseCurrency})</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMoney(totals.cost, baseCurrency)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMoney(totals.value, baseCurrency)}
+                    </TableCell>
+                    <TableCell
+                      className={
+                        totals.gain < 0
+                          ? 'text-right tabular-nums text-negative'
+                          : 'text-right tabular-nums text-positive'
+                      }
+                    >
+                      {formatMoney(totals.gain, baseCurrency, { signDisplay: 'always' })}
+                    </TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
