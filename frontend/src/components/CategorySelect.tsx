@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { useFlatCategories } from '@/api/categories';
+import { useCategories } from '@/api/categories';
 import { Select, type SelectProps } from '@/components/ui/Select';
 
 export interface CategorySelectProps extends SelectProps {
@@ -8,19 +8,37 @@ export interface CategorySelectProps extends SelectProps {
   disabledOptionIds?: Set<string>;
 }
 
-/** Select bound to the (flattened) category tree. Value is category id or ''. */
+/**
+ * Two-level category picker: top-level groups render as native <optgroup>
+ * headings with their subcategories inside, instead of one long flat list.
+ * The group itself stays selectable as "<Group> (general)" so records
+ * categorised at group level keep working.
+ */
 export const CategorySelect = forwardRef<HTMLSelectElement, CategorySelectProps>(
   function CategorySelect({ includeUncategorised = true, disabledOptionIds, ...props }, ref) {
-    const { flat } = useFlatCategories();
+    const { data } = useCategories();
+    const groups = data ?? [];
     return (
       <Select ref={ref} {...props}>
         {includeUncategorised && <option value="">Uncategorised</option>}
-        {flat.map((c) => (
-          <option key={c.id} value={c.id} disabled={disabledOptionIds?.has(c.id)}>
-            {c.label}
-            {c.is_income ? ' (income)' : ''}
-          </option>
-        ))}
+        {groups.map((group) =>
+          group.children && group.children.length > 0 ? (
+            <optgroup key={group.id} label={group.name}>
+              <option value={group.id} disabled={disabledOptionIds?.has(group.id)}>
+                {group.name} (general)
+              </option>
+              {group.children.map((c) => (
+                <option key={c.id} value={c.id} disabled={disabledOptionIds?.has(c.id)}>
+                  {c.name}
+                </option>
+              ))}
+            </optgroup>
+          ) : (
+            <option key={group.id} value={group.id} disabled={disabledOptionIds?.has(group.id)}>
+              {group.name}
+            </option>
+          ),
+        )}
       </Select>
     );
   },
