@@ -11,9 +11,13 @@ import {
   Area,
   ComposedChart,
 } from 'recharts';
-import { CalendarClock, TrendingDown } from 'lucide-react';
+import { CalendarClock, TrendingDown, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useCashflowProjection, useDashboard } from '@/api/dashboard';
-import { formatMoney, formatMoneyCompact } from '@/utils/money';
+import { useScheduledCashflows, useMarkCashflowPaid } from '@/api/scheduledCashflows';
+import { useAccounts } from '@/api/accounts';
+import { useToast } from '@/hooks/useToast';
+import { ApiError } from '@/api/client';
+import { num, formatMoney, formatMoneyCompact } from '@/utils/money';
 import { formatDate, formatDateShort } from '@/utils/date';
 import { COUNTRY_FLAGS, COUNTRY_LABELS } from '@/utils/labels';
 import { chartColors } from '@/components/charts';
@@ -22,10 +26,15 @@ import { SegmentedControl } from '@/components/ui/Tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { MetricCard } from '@/components/MetricCard';
 import { Alert } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Dialog } from '@/components/ui/Dialog';
+import { Select } from '@/components/ui/Select';
+import { Field } from '@/components/ui/Label';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
-import type { CashflowScenario, CashflowHorizon } from '@/types';
+import type { CashflowScenario, CashflowHorizon, ScheduledCashflow, Account, Currency } from '@/types';
 
 const SCENARIOS: { value: CashflowScenario; label: string }[] = [
   { value: 'conservative', label: 'Conservative' },
@@ -235,7 +244,200 @@ export function CashFlowPage() {
           </Card>
         </>
       )}
+
+      <UpcomingBills base={base} />
     </div>
+  );
+}
+
+function UpcomingBills({ base }: { base: Currency }) {
+  const cashflows = useScheduledCashflows();
+  const accounts = useAccounts();
+  const markPaid = useMarkCashflowPaid();
+  const toast = useToast();
+  const [picking, setPicking] = useState<ScheduledCashflow | null>(null);
+
+  const bills = useMemo(
+    () =>
+      (cashflows.data ?? [])
+        .filter((c) => c.status === 'planned' || c.status === 'overdue')
+        .sort((a, b) => a.next_due_date.localeCompare(b.next_due_date)),
+    [cashflows.data],
+  );
+
+  const doMarkPaid = async (cf: ScheduledCashflow, accountId?: string) => {
+    try {
+      await markPaid.mutateAsync({ id: cf.id, account_id: accountId });
+      toast.success(`Marked ${cf.name} paid`);
+      setPicking(null);
+    } catch (err) {
+      toast.error('Could not mark paid', err instanceof ApiError ? err.message : undefined);
+    }
+  };
+
+  const handleClick = (cf: ScheduledCashflow) => {
+    // If the schedule has no account, we must supply one in the request body.
+    if (cf.account_id) {
+      doMarkPaid(cf);
+    } else {
+      setPicking(cf);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Upcoming bills</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {cashflows.isLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : cashflows.isError ? (
+          <ErrorState error={cashflows.error} onRetry={() => cashflows.refetch()} />
+        ) : bills.length === 0 ? (
+          <EmptyState title="No bills due" description="Nothing planned or overdue right now." className="border-0" />
+        ) : (
+          <ul className="divide-y divide-border">
+            {bills.map((cf) => (
+              <li key={cf.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-md bg-muted text-center">
+                    <span className="text-[10px] uppercase text-muted-foreground">
+                      {formatDate(cf.next_due_date, 'MMM')}
+                    </span>
+                    <span className="text-sm font-semibold leading-none text-foreground">
+                      {formatDate(cf.next_due_date, 'd')}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium text-foreground">{cf.name}</p>
+                      {cf.status === 'overdue' && <Badge variant="danger">Overdue</Badge>}
+                    </div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      {cf.direction === 'outflow' ? (
+                        <ArrowUpRight className="h-3 w-3 text-negative" />
+                      ) : (
+                        <ArrowDownLeft className="h-3 w-3 text-positive" />
+                      )}
+                      {cf.direction === 'outflow' ? 'Outflow' : 'Inflow'} · due{' '}
+                      {formatDate(cf.next_due_date)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <p
+                    className={`text-sm font-semibold tabular-nums ${
+                      cf.direction === 'outflow' ? 'text-negative' : 'text-positive'
+                    }`}
+                  >
+                    {formatMoney(num(cf.amount), cf.currency)}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleClick(cf)}
+                    loading={markPaid.isPending && markPaid.variables?.id === cf.id}
+                  >
+                    Mark paid
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+
+      <MarkPaidDialog
+        cashflow={picking}
+        base={base}
+        accounts={accounts.data ?? []}
+        loading={markPaid.isPending}
+        onClose={() => setPicking(null)}
+        onConfirm={(accountId) => picking && doMarkPaid(picking, accountId)}
+      />
+    </Card>
+  );
+}
+
+function MarkPaidDialog({
+  cashflow,
+  base,
+  accounts,
+  loading,
+  onClose,
+  onConfirm,
+}: {
+  cashflow: ScheduledCashflow | null;
+  base: Currency;
+  accounts: Account[];
+  loading: boolean;
+  onClose: () => void;
+  onConfirm: (accountId: string) => void;
+}) {
+  const [accountId, setAccountId] = useState('');
+  const [error, setError] = useState(false);
+
+  // Reset the picker whenever a different cashflow opens the dialog.
+  const open = !!cashflow;
+  const active = accounts.filter((a) => !a.is_archived);
+
+  const submit = () => {
+    if (!accountId) {
+      setError(true);
+      return;
+    }
+    setError(false);
+    onConfirm(accountId);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={() => {
+        setAccountId('');
+        setError(false);
+        onClose();
+      }}
+      title="Mark paid"
+      description={
+        cashflow
+          ? `Choose an account to book "${cashflow.name}" (${formatMoney(num(cashflow.amount), cashflow.currency)}).`
+          : ''
+      }
+      size="sm"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit} loading={loading}>
+            Mark paid
+          </Button>
+        </>
+      }
+    >
+      <Field label="Account" required error={error ? 'Pick an account' : undefined}>
+        <Select
+          value={accountId}
+          invalid={error}
+          onChange={(e) => {
+            setAccountId(e.target.value);
+            setError(false);
+          }}
+        >
+          <option value="">Select an account…</option>
+          {active.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} ({a.currency})
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <p className="mt-2 text-xs text-muted-foreground">
+        The transaction is booked in the account&apos;s own currency; totals convert to {base}.
+      </p>
+    </Dialog>
   );
 }
 

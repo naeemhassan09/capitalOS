@@ -1,9 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { qk } from './queryKeys';
-import type { ScheduledCashflow } from '@/types';
+import type { ScheduledCashflow, Transaction } from '@/types';
 
 export type ScheduledCashflowInput = Omit<ScheduledCashflow, 'id' | 'next_due_date'>;
+
+export interface MarkPaidInput {
+  id: string;
+  /** Required only when the cashflow has no account_id of its own. */
+  account_id?: string;
+  booking_date?: string;
+}
 
 export function useScheduledCashflows() {
   return useQuery({
@@ -40,5 +47,21 @@ export function useDeleteScheduledCashflow() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/scheduled-cashflows/${id}`),
     onSuccess: () => invalidate(qc),
+  });
+}
+
+export function useMarkCashflowPaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: MarkPaidInput) =>
+      api.post<Transaction>(`/scheduled-cashflows/${id}/mark-paid`, { json: body }),
+    onSuccess: () => {
+      // Marking paid books a real transaction: the schedule advances/closes and
+      // the account balance drops, so refresh balances and the dashboard too.
+      qc.invalidateQueries({ queryKey: qk.scheduledCashflows });
+      qc.invalidateQueries({ queryKey: qk.accounts.all });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+    },
   });
 }

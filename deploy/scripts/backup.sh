@@ -40,6 +40,24 @@ if [ -f "$REPO_ROOT/.env" ]; then
     # shellcheck disable=SC1091
     set -a; . "$REPO_ROOT/.env"; set +a
 fi
+# Dedicated backup config (DB target, encryption passphrase, rclone destination).
+# Keep this file OUT of version control — see deploy/backup.env.example.
+if [ -f "$REPO_ROOT/deploy/backup.env" ]; then
+    # shellcheck disable=SC1091
+    set -a; . "$REPO_ROOT/deploy/backup.env"; set +a
+fi
+
+# Off-site upload destination (e.g. "gdrive:CapitalOS" for rclone Google Drive).
+RCLONE_DEST=${RCLONE_DEST:-}
+RCLONE_RETENTION_DAYS=${RCLONE_RETENTION_DAYS:-90}
+
+# Uploading finance data off-site without encryption would leak it to the
+# storage provider — refuse to do that.
+if [ -n "$RCLONE_DEST" ] && [ -z "${BACKUP_ENCRYPTION_PASSPHRASE:-}" ]; then
+    printf '[backup] ERROR: RCLONE_DEST is set but BACKUP_ENCRYPTION_PASSPHRASE is not.\n' >&2
+    printf '[backup] Refusing to upload an unencrypted backup off-site.\n' >&2
+    exit 1
+fi
 
 TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
 mkdir -p "$BACKUP_DIR"
@@ -77,6 +95,22 @@ if [ "$SIZE" -lt 100 ]; then
     exit 1
 fi
 log "Backup complete: $OUTFILE (${SIZE} bytes)"
+
+# --------------------------------------------------------- off-site upload
+# Copy the encrypted dump to a remote (Google Drive via rclone) and prune old
+# remote copies by age. Google only ever sees the AES-256 ciphertext.
+if [ -n "$RCLONE_DEST" ]; then
+    if ! command -v rclone >/dev/null 2>&1; then
+        log "ERROR: RCLONE_DEST set but 'rclone' is not installed."
+        exit 1
+    fi
+    log "Uploading to $RCLONE_DEST ..."
+    rclone copy "$OUTFILE" "$RCLONE_DEST" --no-traverse
+    log "Uploaded $BASENAME to $RCLONE_DEST"
+    log "Pruning remote backups older than ${RCLONE_RETENTION_DAYS}d ..."
+    rclone delete "$RCLONE_DEST" --min-age "${RCLONE_RETENTION_DAYS}d" \
+        --include "capitalos-*" 2>/dev/null || true
+fi
 
 # ------------------------------------------------------------------- pruning
 # Retention: keep the 7 newest daily, 4 weekly (one per ISO week), 6 monthly

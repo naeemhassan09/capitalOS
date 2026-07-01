@@ -70,3 +70,8 @@ class ScheduledCashflowOut(ORMModel):
     auto_match: bool
     created_at: datetime
     updated_at: datetime
+
+
+class MarkPaidRequest(BaseModel):
+    account_id: uuid.UUID | None = None  # override; defaults to the cashflow's account
+    booking_date: date | None = None     # defaults to the due date

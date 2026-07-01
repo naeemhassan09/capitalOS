@@ -43,3 +43,7 @@ backups/
 
 # Claude Code local tooling state
 .claude/
+
+# Backup config (passphrase + rclone dest) — never commit
+deploy/backup.env
+backups/

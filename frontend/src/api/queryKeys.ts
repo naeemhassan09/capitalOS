@@ -27,6 +27,10 @@ export const qk = {
     detail: (id: string) => ['imports', id] as const,
   },
   scheduledCashflows: ['scheduled-cashflows'] as const,
+  budgets: {
+    all: ['budgets'] as const,
+    report: (year: number, month: number) => ['budgets', 'report', year, month] as const,
+  },
   goals: ['goals'] as const,
   reserves: ['reserves'] as const,
   holdings: ['holdings'] as const,

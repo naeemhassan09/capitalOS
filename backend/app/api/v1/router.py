@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     accounts,
     auth,
+    budgets,
     categories,
     dashboard,
     exchange_rates,
@@ -27,6 +28,7 @@ from app.api.v1 import (
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+api_router.include_router(budgets.router)
 api_router.include_router(household.router)
 api_router.include_router(institutions.router)
 api_router.include_router(accounts.router)

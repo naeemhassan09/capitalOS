@@ -263,21 +263,50 @@ export interface ImportPreview {
 
 // --- Scheduled cashflows ---
 export type CashflowDirection = 'inflow' | 'outflow';
-export type CashflowStatus = 'active' | 'paused' | 'completed' | 'cancelled';
+export type CashflowStatus = 'planned' | 'overdue' | 'paid' | 'skipped' | 'cancelled';
 
 export interface ScheduledCashflow {
   id: string;
   name: string;
   direction: CashflowDirection;
-  amount: number;
+  amount: number; // string over the wire — coerce with num()
   currency: Currency;
   first_due_date: string;
-  next_due_date: string | null;
-  recurrence_rule: string;
+  next_due_date: string;
+  recurrence_rule: string | null;
   status: CashflowStatus;
   priority: number;
   account_id?: string | null;
   category_id?: string | null;
+}
+
+// --- Budgets ---
+export interface Budget {
+  id: string;
+  category_id: string;
+  amount: number; // string over the wire — coerce with num()
+  active: boolean;
+}
+
+export interface BudgetReportRow {
+  id: string;
+  category_id: string;
+  category_name: string;
+  amount: number; // monthly limit (base currency)
+  actual_base: number; // spent this period
+  remaining_base: number; // amount - actual (may be negative = over budget)
+  percent_used: number; // 0..(>100)
+  prev_month_base: number;
+  avg_3m_base: number;
+}
+
+export interface BudgetReport {
+  year: number;
+  month: number;
+  base_currency: Currency;
+  total_budget_base: number;
+  total_actual_base: number;
+  rows: BudgetReportRow[];
 }
 
 // --- Goals ---

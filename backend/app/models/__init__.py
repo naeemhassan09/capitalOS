@@ -3,6 +3,7 @@
 from app.models.account import Account
 from app.models.audit import AuditLog
 from app.models.base import Base
+from app.models.budget import Budget
 from app.models.category import Category
 from app.models.exchange_rate import ExchangeRate
 from app.models.goal import SavingsGoal
@@ -18,6 +19,7 @@ from app.models.user import User, UserSession
 
 __all__ = [
     "Base",
+    "Budget",
     "User",
     "UserSession",
     "HouseholdMember",

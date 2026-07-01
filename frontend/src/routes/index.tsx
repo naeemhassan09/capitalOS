@@ -9,6 +9,7 @@ import { AccountsPage } from '@/pages/AccountsPage';
 import { TransactionsPage } from '@/pages/TransactionsPage';
 import { ImportPage } from '@/pages/ImportPage';
 import { CashFlowPage } from '@/pages/CashFlowPage';
+import { BudgetPage } from '@/pages/BudgetPage';
 import { GoalsPage } from '@/pages/GoalsPage';
 import { InvestmentsPage } from '@/pages/InvestmentsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
@@ -48,6 +49,7 @@ export function AppRoutes() {
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/import" element={<ImportPage />} />
         <Route path="/cash-flow" element={<CashFlowPage />} />
+        <Route path="/budget" element={<BudgetPage />} />
         <Route path="/goals" element={<GoalsPage />} />
         <Route path="/investments" element={<InvestmentsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
