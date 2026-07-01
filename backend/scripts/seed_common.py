@@ -167,6 +167,8 @@ def make_holding(
     include_in_net_worth: bool = True,
     notes: str | None = None,
     valuation_date: date | None = None,
+    ticker: str | None = None,
+    cost_basis: Decimal | None = None,
 ) -> Holding:
     holding = Holding(
         user_id=user_id,
@@ -175,6 +177,8 @@ def make_holding(
         asset_class=asset_class,
         native_currency=native_currency.upper(),
         quantity=D(quantity),
+        ticker=ticker,
+        cost_basis=D(cost_basis) if cost_basis is not None else None,
         latest_valuation=D(valuation),
         liquidity_class=liquidity_class,
         include_in_net_worth=include_in_net_worth,
