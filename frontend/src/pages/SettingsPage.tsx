@@ -7,6 +7,7 @@ import { BaseCurrencySection } from './settings/BaseCurrencySection';
 import { CategoriesSection } from './settings/CategoriesSection';
 import { RulesSection } from './settings/RulesSection';
 import { InstitutionsSection } from './settings/InstitutionsSection';
+import { BankConnectionsSection } from './settings/BankConnectionsSection';
 import { ExchangeRatesSection } from './settings/ExchangeRatesSection';
 import { ReservesSection } from './settings/ReservesSection';
 import { SessionsSection } from './settings/SessionsSection';
@@ -18,6 +19,7 @@ type SettingsTab =
   | 'categories'
   | 'rules'
   | 'institutions'
+  | 'banks'
   | 'rates'
   | 'reserves'
   | 'sessions'
@@ -31,6 +33,7 @@ const TABS: TabItem[] = [
   { value: 'categories', label: 'Categories' },
   { value: 'rules', label: 'Rules' },
   { value: 'institutions', label: 'Institutions' },
+  { value: 'banks', label: 'Bank connections' },
   { value: 'rates', label: 'Exchange rates' },
   { value: 'reserves', label: 'Reserves' },
   { value: 'sessions', label: 'Sessions' },
@@ -53,6 +56,7 @@ export function SettingsPage() {
         {tab === 'categories' && <CategoriesSection />}
         {tab === 'rules' && <RulesSection />}
         {tab === 'institutions' && <InstitutionsSection />}
+        {tab === 'banks' && <BankConnectionsSection />}
         {tab === 'rates' && <ExchangeRatesSection />}
         {tab === 'reserves' && <ReservesSection />}
         {tab === 'sessions' && <SessionsSection />}

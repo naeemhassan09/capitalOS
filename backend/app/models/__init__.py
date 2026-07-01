@@ -2,6 +2,7 @@
 
 from app.models.account import Account
 from app.models.audit import AuditLog
+from app.models.bank_connection import BankAccountLink, BankConnection
 from app.models.base import Base
 from app.models.budget import Budget
 from app.models.category import Category
@@ -25,6 +26,8 @@ __all__ = [
     "HouseholdMember",
     "Institution",
     "Account",
+    "BankConnection",
+    "BankAccountLink",
     "Transaction",
     "Category",
     "CategorisationRule",

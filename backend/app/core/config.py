@@ -8,6 +8,7 @@ are missing or left at their insecure defaults.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -83,6 +84,11 @@ class Settings(BaseSettings):
     gocardless_bank_data_secret_id: str = Field(default="")
     gocardless_bank_data_secret_key: str = Field(default="")
 
+    # --- Enable Banking (activates when an app id + private key are present) ---
+    enable_banking_app_id: str = Field(default="")
+    enable_banking_private_key_path: str = Field(default="/app/secrets/enablebanking.pem")
+    enable_banking_auto_sync: bool = Field(default=True)
+
     # --- Observability ---
     sentry_dsn: str = Field(default="")
 
@@ -107,6 +113,13 @@ class Settings(BaseSettings):
     @property
     def trusted_host_list(self) -> list[str]:
         return [h.strip() for h in self.trusted_hosts.split(",") if h.strip()] or ["*"]
+
+    @property
+    def enable_banking_configured(self) -> bool:
+        """True when an app id is set and the private key file actually exists."""
+        return bool(self.enable_banking_app_id) and Path(
+            self.enable_banking_private_key_path
+        ).is_file()
 
     # ------------------------------------------------------------- validation
     @field_validator("encryption_key")

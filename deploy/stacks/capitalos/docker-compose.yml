@@ -20,6 +20,9 @@ services:
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
     volumes:
       - capitalos_uploads:/app/var/uploads
+      # Enable Banking private key — repo root on the server is /opt/capitalos,
+      # so ../../../secrets (from deploy/stacks/capitalos/) = /opt/capitalos/secrets.
+      - ../../../secrets:/app/secrets:ro
     networks:
       edge:
         aliases:

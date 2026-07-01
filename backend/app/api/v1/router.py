@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     accounts,
     auth,
+    bank_connections,
     budgets,
     categories,
     dashboard,
@@ -32,6 +33,7 @@ api_router.include_router(budgets.router)
 api_router.include_router(household.router)
 api_router.include_router(institutions.router)
 api_router.include_router(accounts.router)
+api_router.include_router(bank_connections.router)
 api_router.include_router(transactions.router)
 api_router.include_router(categories.router)
 api_router.include_router(rules.router)

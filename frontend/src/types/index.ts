@@ -80,6 +80,69 @@ export interface BalanceAdjustment {
   as_of?: string;
 }
 
+// --- Bank connections (Enable Banking) ---
+export type BankConnectionStatus = 'pending' | 'active' | 'expired' | 'revoked';
+
+export interface BankStatus {
+  configured: boolean;
+}
+
+export interface Aspsp {
+  name: string;
+  country: string;
+}
+
+export interface BankAccountLink {
+  id: string;
+  account_id: string;
+  display_name: string;
+  identifier_masked: string | null;
+  currency: string | null;
+  enabled: boolean;
+  last_synced_at: string | null;
+}
+
+export interface BankConnection {
+  id: string;
+  provider: string;
+  aspsp_name: string;
+  aspsp_country: string;
+  status: BankConnectionStatus;
+  valid_until: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  links: BankAccountLink[];
+}
+
+export interface DiscoveredBankAccount {
+  uid: string;
+  name: string;
+  identifier_masked: string;
+  currency: string | null;
+}
+
+export interface CompleteBankAuthResponse {
+  connection_id: string;
+  aspsp_name: string;
+  accounts: DiscoveredBankAccount[];
+}
+
+export interface BankLinkMapping {
+  external_uid: string;
+  account_id: string;
+  display_name?: string;
+  identifier_masked?: string | null;
+  currency?: string | null;
+}
+
+export interface BankSyncResult {
+  connection_id: string;
+  accounts_synced: number;
+  transactions_created: number;
+  duplicates_skipped: number;
+  errors: string[];
+}
+
 // --- Institutions ---
 export type InstitutionType = 'bank' | 'broker' | 'pension' | 'wallet' | 'other';
 

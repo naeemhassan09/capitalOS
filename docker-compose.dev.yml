@@ -34,6 +34,7 @@ services:
     volumes:
       - ./backend:/app          # hot reload + persist generated migrations
       - uploads:/app/var/uploads
+      - ./secrets:/app/secrets:ro   # Enable Banking private key (optional)
     ports:
       - "127.0.0.1:8001:8000"   # host 8001 → container 8000 (8000 often taken locally)
     command: >

@@ -11,6 +11,13 @@ export const qk = {
     all: ['accounts'] as const,
     detail: (id: string) => ['accounts', id] as const,
   },
+  bankConnections: {
+    all: ['bank-connections'] as const,
+    status: ['bank-connections', 'status'] as const,
+    aspsps: (country: string) => ['bank-connections', 'aspsps', country] as const,
+    discovered: (connectionId: string) =>
+      ['bank-connections', 'discovered', connectionId] as const,
+  },
   institutions: ['institutions'] as const,
   household: ['household'] as const,
   categories: ['categories'] as const,

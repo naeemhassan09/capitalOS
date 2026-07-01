@@ -29,6 +29,8 @@ FX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
 FX_SYNC_STARTUP_DELAY_SECONDS = 60
 PRICE_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
 PRICE_SYNC_STARTUP_DELAY_SECONDS = 120  # offset from the FX loop's 60s
+BANK_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
+BANK_SYNC_STARTUP_DELAY_SECONDS = 180  # offset from the FX (60s) and price (120s) loops
 
 
 def _run_fx_sync() -> None:
@@ -47,6 +49,18 @@ def _run_price_sync() -> None:
     """Open a session and sync holding prices for every user (runs in a thread)."""
     from app.core.db import SessionLocal
     from app.services.price_sync import sync_all_users
+
+    db = SessionLocal()
+    try:
+        sync_all_users(db)
+    finally:
+        db.close()
+
+
+def _run_bank_sync() -> None:
+    """Open a session and sync bank connections for every user (runs in a thread)."""
+    from app.core.db import SessionLocal
+    from app.services.bank_sync import sync_all_users
 
     db = SessionLocal()
     try:
@@ -79,6 +93,11 @@ async def _lifespan(app: FastAPI):
             "price", _run_price_sync,
             PRICE_SYNC_STARTUP_DELAY_SECONDS, PRICE_SYNC_INTERVAL_SECONDS)))
         logger.info("Daily price auto-sync enabled")
+    if settings.enable_banking_configured and settings.enable_banking_auto_sync:
+        tasks.append(asyncio.create_task(_daily_loop(
+            "bank", _run_bank_sync,
+            BANK_SYNC_STARTUP_DELAY_SECONDS, BANK_SYNC_INTERVAL_SECONDS)))
+        logger.info("Daily bank auto-sync enabled")
     yield
     for task in tasks:
         task.cancel()

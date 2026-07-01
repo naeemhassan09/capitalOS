@@ -47,3 +47,6 @@ backups/
 # Backup config (passphrase + rclone dest) — never commit
 deploy/backup.env
 backups/
+
+# Open-banking private keys — never commit
+secrets/

@@ -14,6 +14,7 @@ import { GoalsPage } from '@/pages/GoalsPage';
 import { InvestmentsPage } from '@/pages/InvestmentsPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { BankCallbackPage } from '@/pages/BankCallbackPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -54,6 +55,7 @@ export function AppRoutes() {
         <Route path="/investments" element={<InvestmentsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/bank-callback" element={<BankCallbackPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
