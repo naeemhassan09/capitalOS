@@ -24,6 +24,9 @@ class User(UUIDPKMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_owner: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Optional short PIN for quick sign-in (Argon2id-hashed, like the password).
+    pin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     # TOTP fields modelled now; the enable/verify flow is deferred (see README).
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     encrypted_totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)

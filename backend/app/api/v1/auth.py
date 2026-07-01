@@ -18,7 +18,9 @@ from app.models.user import User, UserSession
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
+    PinLoginRequest,
     SessionOut,
+    SetPinRequest,
     SetupRequest,
     SetupStatus,
     UserOut,
@@ -58,7 +60,54 @@ def _clear_auth_cookies(response: Response) -> None:
 
 @router.get("/setup-status", response_model=SetupStatus)
 def setup_status(db: Session = Depends(get_db)) -> SetupStatus:
-    return SetupStatus(initialized=auth_service.is_initialized(db))
+    return SetupStatus(
+        initialized=auth_service.is_initialized(db),
+        pin_enabled=auth_service.pin_enabled(db),
+    )
+
+
+@router.post("/pin/login", response_model=UserOut)
+def pin_login(
+    payload: PinLoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> User:
+    ip = get_client_ip(request)
+    user = auth_service.authenticate_pin(db, pin=payload.pin, ip=ip)
+    session = auth_service.create_session(
+        db, user=user, ip=ip, user_agent=request.headers.get("user-agent")
+    )
+    log_event(db, action="auth.pin_login", user_id=user.id, entity_type="user",
+              entity_id=user.id, request=request)
+    db.commit()
+    _set_auth_cookies(response, session)
+    return user
+
+
+@router.post("/pin", response_model=Message)
+def set_pin(
+    payload: SetPinRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Message:
+    auth_service.set_pin(db, user=user, current_password=payload.current_password, pin=payload.pin)
+    log_event(db, action="auth.set_pin", user_id=user.id, request=request)
+    db.commit()
+    return Message(detail="PIN set")
+
+
+@router.delete("/pin", response_model=Message)
+def delete_pin(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Message:
+    auth_service.remove_pin(db, user=user)
+    log_event(db, action="auth.remove_pin", user_id=user.id, request=request)
+    db.commit()
+    return Message(detail="PIN removed")
 
 
 @router.post("/setup", response_model=UserOut, status_code=status.HTTP_201_CREATED)

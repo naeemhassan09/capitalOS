@@ -16,6 +16,7 @@ export interface User {
 
 export interface SetupStatus {
   initialized: boolean;
+  pin_enabled: boolean;
 }
 
 export interface SessionInfo {

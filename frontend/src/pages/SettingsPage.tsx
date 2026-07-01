@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { ProfileSection, ChangePasswordSection } from './settings/ProfileSection';
+import { PinSection } from './settings/PinSection';
 import { BaseCurrencySection } from './settings/BaseCurrencySection';
 import { CategoriesSection } from './settings/CategoriesSection';
 import { RulesSection } from './settings/RulesSection';
@@ -21,6 +22,7 @@ type SettingsTab =
   | 'reserves'
   | 'sessions'
   | 'password'
+  | 'pin'
   | 'data';
 
 const TABS: TabItem[] = [
@@ -33,6 +35,7 @@ const TABS: TabItem[] = [
   { value: 'reserves', label: 'Reserves' },
   { value: 'sessions', label: 'Sessions' },
   { value: 'password', label: 'Change password' },
+  { value: 'pin', label: 'PIN sign-in' },
   { value: 'data', label: 'Data & 2FA' },
 ];
 
@@ -54,6 +57,7 @@ export function SettingsPage() {
         {tab === 'reserves' && <ReservesSection />}
         {tab === 'sessions' && <SessionsSection />}
         {tab === 'password' && <ChangePasswordSection />}
+        {tab === 'pin' && <PinSection />}
         {tab === 'data' && <DataSection />}
       </div>
     </div>

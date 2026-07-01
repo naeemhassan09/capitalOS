@@ -21,6 +21,15 @@ export interface ChangePasswordPayload {
   new_password: string;
 }
 
+export interface PinLoginPayload {
+  pin: string;
+}
+
+export interface SetPinPayload {
+  current_password: string;
+  pin: string;
+}
+
 export function useSetupStatus() {
   return useQuery({
     queryKey: qk.auth.setupStatus,
@@ -55,7 +64,7 @@ export function useSetup() {
     mutationFn: (payload: SetupPayload) => api.post<User>('/auth/setup', { json: payload }),
     onSuccess: (user) => {
       qc.setQueryData(qk.auth.me, user);
-      qc.setQueryData(qk.auth.setupStatus, { initialized: true });
+      qc.setQueryData(qk.auth.setupStatus, { initialized: true, pin_enabled: false });
       qc.invalidateQueries();
     },
   });
@@ -69,6 +78,36 @@ export function useLogin() {
       qc.setQueryData(qk.auth.me, user);
       qc.invalidateQueries();
     },
+  });
+}
+
+/** Sign in with a PIN. Public endpoint (no CSRF needed); refreshes the session queries like useLogin. */
+export function usePinLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PinLoginPayload) => api.post<User>('/auth/pin/login', { json: payload }),
+    onSuccess: (user) => {
+      qc.setQueryData(qk.auth.me, user);
+      qc.invalidateQueries();
+    },
+  });
+}
+
+/** Set or change the account PIN (authenticated). */
+export function useSetPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SetPinPayload) => api.post<{ detail: string }>('/auth/pin', { json: payload }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.auth.setupStatus }),
+  });
+}
+
+/** Remove the account PIN (authenticated). */
+export function useRemovePin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<{ detail: string }>('/auth/pin'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.auth.setupStatus }),
   });
 }
 

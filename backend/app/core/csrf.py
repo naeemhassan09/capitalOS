@@ -21,7 +21,7 @@ CSRF_HEADER_NAME = "x-csrf-token"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 # Session-bootstrap endpoints that establish (rather than act on) a session.
 # The CSRF token is issued *by* these responses, so they cannot require it.
-EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/setup"}
+EXEMPT_PATHS = {"/api/v1/auth/login", "/api/v1/auth/setup", "/api/v1/auth/pin/login"}
 
 
 def generate_csrf_token() -> str:

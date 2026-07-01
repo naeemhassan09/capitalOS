@@ -18,6 +18,10 @@ from app.services.defaults import seed_defaults_for_user
 
 # In-process login throttle (single-instance local deployment). Keyed by IP.
 _attempts: dict[str, deque[float]] = defaultdict(deque)
+# PINs are short, so throttle them harder than passwords.
+_pin_attempts: dict[str, deque[float]] = defaultdict(deque)
+PIN_MAX_ATTEMPTS = 5
+PIN_WINDOW_SECONDS = 900  # 15 minutes
 
 
 def _check_rate_limit(ip: str | None) -> None:
@@ -47,6 +51,11 @@ def _clear_attempts(ip: str | None) -> None:
 
 def is_initialized(db: Session) -> bool:
     return db.scalar(select(User.id).limit(1)) is not None
+
+
+def pin_enabled(db: Session) -> bool:
+    owner = db.scalar(select(User).where(User.is_owner.is_(True)))
+    return bool(owner and owner.pin_hash)
 
 
 def create_owner(db: Session, *, email: str, password: str, display_name: str,
@@ -87,6 +96,52 @@ def authenticate(db: Session, *, email: str, password: str, ip: str | None) -> U
     _clear_attempts(ip)
     user.last_login_at = datetime.now(UTC)
     return user
+
+
+def _check_pin_rate_limit(ip: str | None) -> None:
+    if ip is None:
+        return
+    now = time.time()
+    q = _pin_attempts[ip]
+    while q and now - q[0] > PIN_WINDOW_SECONDS:
+        q.popleft()
+    if len(q) >= PIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many PIN attempts. Please wait 15 minutes or use your password.",
+        )
+
+
+def set_pin(db: Session, *, user: User, current_password: str, pin: str) -> None:
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect."
+        )
+    if not (pin.isdigit() and 4 <= len(pin) <= 8):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="PIN must be 4-8 digits."
+        )
+    user.pin_hash = hash_password(pin)
+
+
+def remove_pin(db: Session, *, user: User) -> None:
+    user.pin_hash = None
+
+
+def authenticate_pin(db: Session, *, pin: str, ip: str | None) -> User:
+    _check_pin_rate_limit(ip)
+    owner = db.scalar(select(User).where(User.is_owner.is_(True)))
+    if owner is None or owner.pin_hash is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="PIN sign-in is not set up."
+        )
+    if not owner.is_active or not verify_password(pin, owner.pin_hash):
+        _pin_attempts[ip].append(time.time()) if ip else None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid PIN.")
+    if ip and ip in _pin_attempts:
+        _pin_attempts[ip].clear()
+    owner.last_login_at = datetime.now(UTC)
+    return owner
 
 
 def create_session(db: Session, *, user: User, ip: str | None, user_agent: str | None

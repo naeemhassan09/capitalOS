@@ -42,6 +42,16 @@ class UserOut(ORMModel):
 
 class SetupStatus(BaseModel):
     initialized: bool
+    pin_enabled: bool = False
+
+
+class SetPinRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    pin: str = Field(pattern=r"^\d{4,8}$")
+
+
+class PinLoginRequest(BaseModel):
+    pin: str = Field(pattern=r"^\d{4,8}$")
 
 
 class SessionOut(ORMModel):
