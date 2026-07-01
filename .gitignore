@@ -1,0 +1,45 @@
+# Secrets & local config
+.env
+.env.*
+!.env.example
+
+# Real personal data — never commit
+scripts/seed_real.py
+scripts/real_data/
+backend/scripts/seed_real.py
+backend/scripts/real_data/
+*.real.*
+backend/var/
+uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# Backups
+backups/
+*.sql.gz
+*.sql.gz.enc
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local tooling state
+.claude/

@@ -1,0 +1,64 @@
+name: capitalos
+
+# CapitalOS application stack for the multi-site host.
+# No Caddy, no Postgres here — it uses the SHARED ones from the edge stack:
+#   - joins `edge`  so the shared Caddy can reach it (aliases below)
+#   - joins `dbnet` so it can reach the shared Postgres (host: shared-postgres)
+# Build contexts point back into the repo (this file lives in deploy/stacks/capitalos/).
+
+services:
+  backend:
+    build:
+      context: ../../../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: production
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    volumes:
+      - capitalos_uploads:/app/var/uploads
+    networks:
+      edge:
+        aliases:
+          - capitalos-backend
+      dbnet: {}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  frontend:
+    build:
+      context: ../../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      edge:
+        aliases:
+          - capitalos-frontend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  capitalos_uploads:
+
+networks:
+  edge:
+    external: true
+  dbnet:
+    external: true

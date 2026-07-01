@@ -1,0 +1,65 @@
+name: edge
+
+# Shared edge stack for a multi-site host:
+#   - Caddy: the ONLY public service (80/443), automatic Let's Encrypt for every
+#     domain, reverse-proxies each site by hostname.
+#   - Postgres: ONE shared database server; each site gets its own database +
+#     dedicated role (see deploy/scripts/provision-db.sh). Efficient on RAM.
+#
+# Two external networks connect everything (created by bootstrap.sh):
+#   - edge  : Caddy <-> each app's web containers
+#   - dbnet : each app's backend <-> the shared Postgres (never exposed publicly)
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"      # HTTP/3
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deploy/edge/.env}
+      CAPITALOS_DOMAIN: ${CAPITALOS_DOMAIN:?set CAPITALOS_DOMAIN in deploy/edge/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # persisted certificates — do NOT delete
+      - caddy_config:/config
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-capitaladmin}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in deploy/edge/.env}
+    volumes:
+      - shared_pgdata:/var/lib/postgresql/data
+    networks:
+      dbnet:
+        aliases:
+          - shared-postgres      # apps connect to host "shared-postgres"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-capitaladmin} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Not published to the host — reachable only on the private dbnet network.
+
+volumes:
+  caddy_data:
+  caddy_config:
+  shared_pgdata:
+
+networks:
+  edge:
+    external: true
+  dbnet:
+    external: true

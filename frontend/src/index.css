@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 221 83% 45%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 222 47% 20%;
+
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 16% 42%;
+
+    --accent: 210 20% 92%;
+    --accent-foreground: 222 47% 20%;
+
+    --border: 214 24% 88%;
+    --input: 214 24% 86%;
+    --ring: 221 83% 45%;
+
+    --radius: 0.6rem;
+
+    /* Financial semantic tokens (light) */
+    --settled: 221 83% 45%;
+    --pending: 38 92% 45%;
+    --projected: 262 60% 55%;
+    --protected: 199 70% 40%;
+    --deployable: 152 60% 36%;
+    --invested: 262 60% 55%;
+    --illiquid: 25 55% 45%;
+    --positive: 152 60% 36%;
+    --negative: 0 72% 48%;
+
+    /* Alert levels (light) */
+    --danger: 0 72% 48%;
+    --danger-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 30 40% 12%;
+    --info: 217 91% 50%;
+    --info-foreground: 0 0% 100%;
+    --success: 152 60% 34%;
+    --success-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 30% 92%;
+
+    --card: 222 40% 11%;
+    --card-foreground: 210 30% 92%;
+
+    --popover: 222 40% 11%;
+    --popover-foreground: 210 30% 92%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 8%;
+
+    --secondary: 217 30% 18%;
+    --secondary-foreground: 210 30% 92%;
+
+    --muted: 217 30% 16%;
+    --muted-foreground: 215 20% 62%;
+
+    --accent: 217 30% 20%;
+    --accent-foreground: 210 30% 92%;
+
+    --border: 217 30% 20%;
+    --input: 217 30% 22%;
+    --ring: 217 91% 60%;
+
+    /* Financial semantic tokens (dark) */
+    --settled: 217 91% 62%;
+    --pending: 38 92% 58%;
+    --projected: 262 70% 70%;
+    --protected: 199 80% 58%;
+    --deployable: 152 55% 50%;
+    --invested: 262 70% 70%;
+    --illiquid: 25 65% 60%;
+    --positive: 152 55% 50%;
+    --negative: 0 72% 62%;
+
+    /* Alert levels (dark) */
+    --danger: 0 72% 60%;
+    --danger-foreground: 0 0% 100%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 30 40% 10%;
+    --info: 217 91% 62%;
+    --info-foreground: 222 47% 8%;
+    --success: 152 55% 48%;
+    --success-foreground: 0 0% 100%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numeric tabular alignment for money columns */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar that respects theme */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring;
+  }
+}

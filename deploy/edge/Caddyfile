@@ -1,0 +1,50 @@
+# Shared Caddy config for all sites on this host.
+# Automatic HTTPS (Let's Encrypt) is on by default; just declare each domain.
+# To add a new site: copy a site block, change the domain + upstream aliases,
+# then `docker compose -f deploy/edge/docker-compose.yml restart caddy`.
+{
+	email {$ACME_EMAIL}
+	# Uncomment to test against Let's Encrypt staging (avoids rate limits):
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+}
+
+# ------------------------------------------------------------------ CapitalOS
+# Domain is injected from the environment (CAPITALOS_DOMAIN in deploy/edge/.env)
+# so the real hostname stays out of the repository.
+{$CAPITALOS_DOMAIN} {
+	encode zstd gzip
+	import security_headers
+
+	# API → FastAPI backend (container alias on the `edge` network)
+	handle /api/* {
+		reverse_proxy capitalos-backend:8000
+	}
+
+	# Everything else → the React SPA (nginx)
+	handle {
+		reverse_proxy capitalos-frontend:80
+	}
+
+	request_body {
+		max_size 10MB
+	}
+}
+
+# ------------------------------------------------------------- add more sites
+# example.com {
+# 	encode zstd gzip
+# 	import security_headers
+# 	handle /api/* { reverse_proxy example-backend:8000 }
+# 	handle { reverse_proxy example-frontend:80 }
+# }

@@ -1,0 +1,33 @@
+# CapitalOS reverse proxy. Automatic HTTPS via Let's Encrypt when DOMAIN is a
+# real hostname. Only this service is exposed publicly.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+
+	# Limit upload body size (CSV imports)
+	request_body {
+		max_size 10MB
+	}
+
+	# API → FastAPI backend
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else → the React frontend (nginx serving the SPA)
+	handle {
+		reverse_proxy frontend:80
+	}
+}
+
+# Redirect bare HTTP to HTTPS is automatic in Caddy for real domains.
