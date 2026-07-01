@@ -366,17 +366,19 @@ export interface Reserve {
 }
 
 // --- Holdings ---
+// Must match the backend vocabulary (app/models/enums.py).
 export type AssetClass =
-  | 'equity'
-  | 'bond'
-  | 'fund'
+  | 'cash'
+  | 'stock'
   | 'etf'
+  | 'mutual_fund'
+  | 'pension'
   | 'crypto'
   | 'commodity'
-  | 'cash'
   | 'property'
+  | 'private_equity'
   | 'other';
-export type LiquidityClass = 'liquid' | 'semi_liquid' | 'illiquid';
+export type LiquidityClass = 'immediate' | 'short_term' | 'restricted' | 'illiquid';
 
 export interface Holding {
   id: string;

@@ -63,20 +63,22 @@ export const TX_DIRECTION_LABELS: Record<TxDirection, string> = {
 };
 
 export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
-  equity: 'Equity',
-  bond: 'Bond',
-  fund: 'Fund',
+  cash: 'Cash',
+  stock: 'Stock',
   etf: 'ETF',
+  mutual_fund: 'Mutual fund',
+  pension: 'Pension',
   crypto: 'Crypto',
   commodity: 'Commodity',
-  cash: 'Cash',
   property: 'Property',
+  private_equity: 'Private equity',
   other: 'Other',
 };
 
 export const LIQUIDITY_LABELS: Record<LiquidityClass, string> = {
-  liquid: 'Liquid',
-  semi_liquid: 'Semi-liquid',
+  immediate: 'Immediate (deployable)',
+  short_term: 'Short-term',
+  restricted: 'Restricted',
   illiquid: 'Illiquid',
 };
 

@@ -51,12 +51,15 @@ const LIQUIDITY_CLASSES = Object.keys(LIQUIDITY_LABELS) as LiquidityClass[];
 const holdingSchema = z.object({
   asset_name: z.string().min(1, 'Required'),
   ticker: z.string().optional(),
-  asset_class: z.enum(['equity', 'bond', 'fund', 'etf', 'crypto', 'commodity', 'cash', 'property', 'other']),
+  asset_class: z.enum([
+    'cash', 'stock', 'etf', 'mutual_fund', 'pension',
+    'crypto', 'commodity', 'property', 'private_equity', 'other',
+  ]),
   quantity: z.coerce.number(),
   native_currency: z.enum(['EUR', 'PKR', 'USD', 'GBP', 'SAR']),
   cost_basis: z.coerce.number(),
   latest_valuation: z.coerce.number().optional(),
-  liquidity_class: z.enum(['liquid', 'semi_liquid', 'illiquid']),
+  liquidity_class: z.enum(['immediate', 'short_term', 'restricted', 'illiquid']),
   include_in_net_worth: z.boolean(),
 });
 type HoldingFormValues = z.infer<typeof holdingSchema>;
@@ -409,12 +412,12 @@ function HoldingFormDialog({
     values: {
       asset_name: holding?.asset_name ?? '',
       ticker: holding?.ticker ?? '',
-      asset_class: holding?.asset_class ?? 'equity',
+      asset_class: holding?.asset_class ?? 'stock',
       quantity: holding?.quantity ?? 0,
       native_currency: (holding?.native_currency ?? 'EUR') as Currency,
       cost_basis: holding?.cost_basis ?? 0,
       latest_valuation: holding?.latest_valuation ?? undefined,
-      liquidity_class: holding?.liquidity_class ?? 'liquid',
+      liquidity_class: holding?.liquidity_class ?? 'immediate',
       include_in_net_worth: holding?.include_in_net_worth ?? true,
     },
   });

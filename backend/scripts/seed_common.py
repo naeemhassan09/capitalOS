@@ -349,7 +349,11 @@ def make_rate(
     rate: Decimal,
     rate_date: date,
 ) -> ExchangeRate:
-    """Create an exchange rate row: ``1 base_currency = rate quote_currency``."""
+    """Create an exchange rate row: ``1 base_currency = rate quote_currency``.
+
+    Seeded rates are bootstrap values only (``is_manual=False``) so the daily
+    FX auto-sync immediately supersedes them with live market rates.
+    """
     fx = ExchangeRate(
         user_id=user_id,
         base_currency=base_currency.upper(),
@@ -357,7 +361,7 @@ def make_rate(
         rate=D(rate),
         rate_date=rate_date,
         source="seed",
-        is_manual=True,
+        is_manual=False,
     )
     db.add(fx)
     db.flush()
