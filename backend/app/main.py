@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +24,44 @@ logging.basicConfig(
 )
 logger = logging.getLogger("capitalos")
 
+FX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
+FX_SYNC_STARTUP_DELAY_SECONDS = 60
+
+
+def _run_fx_sync() -> None:
+    """Open a session and sync FX rates for every user (runs in a thread)."""
+    from app.core.db import SessionLocal
+    from app.services.fx_sync import sync_all_users
+
+    db = SessionLocal()
+    try:
+        sync_all_users(db)
+    finally:
+        db.close()
+
+
+async def _fx_daily_loop() -> None:
+    await asyncio.sleep(FX_SYNC_STARTUP_DELAY_SECONDS)
+    while True:
+        try:
+            await asyncio.to_thread(_run_fx_sync)
+        except Exception:  # noqa: BLE001 - keep the loop alive whatever happens
+            logger.exception("Daily FX sync run failed")
+        await asyncio.sleep(FX_SYNC_INTERVAL_SECONDS)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    task: asyncio.Task | None = None
+    if settings.fx_auto_sync:
+        task = asyncio.create_task(_fx_daily_loop())
+        logger.info("Daily FX auto-sync enabled")
+    yield
+    if task is not None:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -29,6 +70,7 @@ def create_app() -> FastAPI:
         description="CapitalOS — privacy-first personal & household finance.",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+        lifespan=_lifespan,
     )
 
     app.add_middleware(

@@ -47,3 +47,12 @@ class ConversionResult(BaseModel):
     to_currency: str
     on_date: date | None
     converted: Decimal
+
+
+class FxSyncResult(BaseModel):
+    base_currency: str
+    rate_date: date
+    source: str
+    updated: list[str]
+    skipped_manual: list[str]
+    rates: dict[str, Decimal]

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Pencil, ArrowLeftRight } from 'lucide-react';
+import { Plus, Trash2, Pencil, ArrowLeftRight, RefreshCw } from 'lucide-react';
 import {
   useExchangeRates,
   useCreateExchangeRate,
   useUpdateExchangeRate,
   useDeleteExchangeRate,
   useConvert,
+  useSyncExchangeRates,
 } from '@/api/exchangeRates';
 import { useToast } from '@/hooks/useToast';
 import { ApiError } from '@/api/client';
@@ -35,10 +36,26 @@ import type { ExchangeRate, Currency } from '@/types';
 export function ExchangeRatesSection() {
   const rates = useExchangeRates();
   const del = useDeleteExchangeRate();
+  const sync = useSyncExchangeRates();
   const toast = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ExchangeRate | null>(null);
   const [deleting, setDeleting] = useState<ExchangeRate | null>(null);
+
+  const runSync = async () => {
+    try {
+      const res = await sync.mutateAsync();
+      const skipped = res.skipped_manual.length
+        ? ` (manual kept: ${res.skipped_manual.join(', ')})`
+        : '';
+      toast.success(
+        `Rates synced from ${res.source}`,
+        `${res.base_currency} → ${res.updated.join(', ')}${skipped}`,
+      );
+    } catch (err) {
+      toast.error('Sync failed', err instanceof ApiError ? err.message : undefined);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -47,11 +64,19 @@ export function ExchangeRatesSection() {
         <CardHeader className="flex-row items-start justify-between">
           <div>
             <CardTitle>Exchange rates</CardTitle>
-            <CardDescription>Manual FX rates used to convert to your base currency.</CardDescription>
+            <CardDescription>
+              Auto-synced daily from a free market feed; manual rates for the same day
+              always win. Historical rates are never rewritten.
+            </CardDescription>
           </div>
-          <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus className="h-4 w-4" /> Add rate
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={runSync} loading={sync.isPending}>
+              <RefreshCw className="h-4 w-4" /> Sync now
+            </Button>
+            <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
+              <Plus className="h-4 w-4" /> Add rate
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {rates.isLoading ? (

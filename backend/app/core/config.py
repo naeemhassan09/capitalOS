@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     backup_s3_bucket: str = Field(default="")
     backup_encryption_passphrase: str = Field(default="")
 
+    # --- FX ---
+    # Daily background sync of exchange rates from a free external source.
+    fx_auto_sync: bool = Field(default=True)
+
     # --- Open Banking (feature-flagged off) ---
     open_banking_enabled: bool = Field(default=False)
     gocardless_bank_data_secret_id: str = Field(default="")

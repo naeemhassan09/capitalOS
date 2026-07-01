@@ -15,6 +15,7 @@ from app.core.deps import get_current_user
 from app.models.exchange_rate import ExchangeRate
 from app.models.user import User
 from app.providers.fx import FxError, ManualFxProvider
+from app.providers.fx_external import ExternalFxError
 from app.repositories.base import get_owned_or_404
 from app.schemas.common import Message
 from app.schemas.exchange_rate import (
@@ -22,8 +23,10 @@ from app.schemas.exchange_rate import (
     ExchangeRateCreate,
     ExchangeRateOut,
     ExchangeRateUpdate,
+    FxSyncResult,
 )
 from app.services.audit import log_event
+from app.services.fx_sync import sync_user_rates
 
 router = APIRouter(prefix="/exchange-rates", tags=["exchange-rates"])
 
@@ -72,6 +75,30 @@ def convert(
         on_date=on_date,
         converted=amount * rate,
     )
+
+
+@router.post("/sync", response_model=FxSyncResult)
+def sync_rates(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> FxSyncResult:
+    """Fetch today's market rates from a free external source and store them.
+
+    Manual rates entered for today are never overwritten; historical rows are
+    never touched.
+    """
+    try:
+        result = sync_user_rates(db, user)
+    except ExternalFxError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Could not fetch external rates: {exc}"
+        ) from exc
+    log_event(db, action="exchange_rate.sync", user_id=user.id,
+              entity_type="exchange_rate", request=request,
+              after={"updated": result["updated"], "source": result["source"]})
+    db.commit()
+    return FxSyncResult(**result)
 
 
 @router.post("", response_model=ExchangeRateOut, status_code=201)

@@ -49,3 +49,21 @@ export function useConvert() {
       api.get<ConvertResult>('/exchange-rates/convert', { params }),
   });
 }
+
+export interface FxSyncResult {
+  base_currency: Currency;
+  rate_date: string;
+  source: string;
+  updated: string[];
+  skipped_manual: string[];
+  rates: Record<string, string | number>;
+}
+
+/** Fetch today's market rates from the free external source (server-side). */
+export function useSyncExchangeRates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<FxSyncResult>('/exchange-rates/sync'),
+    onSuccess: () => invalidate(qc),
+  });
+}
