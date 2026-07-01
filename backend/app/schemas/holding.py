@@ -94,3 +94,21 @@ class ValuationOut(ORMModel):
     source: str
     created_at: datetime
     updated_at: datetime
+
+
+class PriceUpdate(BaseModel):
+    asset_name: str
+    ticker: str
+    price: Decimal
+    valuation: Decimal
+
+
+class PriceSyncError(BaseModel):
+    name: str
+    error: str
+
+
+class PriceSyncResult(BaseModel):
+    updated: list[PriceUpdate]
+    skipped: list[str]
+    errors: list[PriceSyncError]

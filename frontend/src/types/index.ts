@@ -392,6 +392,7 @@ export interface Holding {
   valuation_date: string | null;
   liquidity_class: LiquidityClass;
   include_in_net_worth: boolean;
+  valuation_is_manual: boolean;
 }
 
 export interface HoldingValuation {

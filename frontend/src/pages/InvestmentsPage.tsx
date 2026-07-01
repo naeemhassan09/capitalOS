@@ -3,13 +3,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Plus, Pencil, Trash2, LineChart, TrendingUp, Info } from 'lucide-react';
+import { Plus, Pencil, Trash2, LineChart, TrendingUp, Info, RefreshCw } from 'lucide-react';
 import {
   useHoldings,
   useCreateHolding,
   useUpdateHolding,
   useDeleteHolding,
   useAddValuation,
+  useSyncPrices,
 } from '@/api/holdings';
 import { useExchangeRates } from '@/api/exchangeRates';
 import { useDashboard } from '@/api/dashboard';
@@ -118,6 +119,8 @@ export function InvestmentsPage() {
   const holdings = useHoldings();
   const exchangeRates = useExchangeRates();
   const dashboard = useDashboard();
+  const syncPrices = useSyncPrices();
+  const toast = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
   const [deleting, setDeleting] = useState<Holding | null>(null);
@@ -126,6 +129,21 @@ export function InvestmentsPage() {
   const rows = holdings.data ?? [];
   const colors = chartColors();
   const palette = categoricalPalette();
+
+  const runPriceSync = async () => {
+    try {
+      const res = await syncPrices.mutateAsync();
+      toast.success(
+        'Prices synced',
+        `${res.updated.length} updated, ${res.skipped.length} skipped`,
+      );
+      for (const e of res.errors) {
+        toast.error(`Price sync failed: ${e.name}`, e.error);
+      }
+    } catch (err) {
+      toast.error('Price sync failed', err instanceof ApiError ? err.message : undefined);
+    }
+  };
 
   const baseCurrency: Currency = dashboard.data?.base_currency ?? 'EUR';
   const convert = useMemo(
@@ -178,21 +196,31 @@ export function InvestmentsPage() {
         title="Investments"
         description="Holdings, allocation and gain/loss."
         actions={
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> New holding
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runPriceSync}
+              loading={syncPrices.isPending}
+            >
+              <RefreshCw className="h-4 w-4" /> Sync prices
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> New holding
+            </Button>
+          </div>
         }
       />
 
-      <Alert variant="info" title="Manual valuations only" icon>
-        Valuations shown here are the figures you enter — they are <strong>not live market prices</strong>. Update
-        them to keep net worth accurate.
+      <Alert variant="info" title="Valuation updates" icon>
+        Holdings with a ticker + quantity update automatically; others are manual. Update manual
+        valuations to keep net worth accurate.
       </Alert>
 
       {holdings.isLoading ? (
@@ -276,6 +304,11 @@ export function InvestmentsPage() {
                           {h.latest_valuation != null ? (
                             <span title={h.valuation_date ? `As of ${formatDate(h.valuation_date)}` : undefined}>
                               {formatMoney(h.latest_valuation, h.native_currency)}
+                              {h.valuation_is_manual === false && (
+                                <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  auto
+                                </span>
+                              )}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -462,7 +495,7 @@ function HoldingFormDialog({
           <Field label="Asset name" required error={errors.asset_name?.message}>
             <Input invalid={!!errors.asset_name} {...register('asset_name')} />
           </Field>
-          <Field label="Ticker" hint="Optional">
+          <Field label="Ticker" hint="e.g. AAPL.US (stooq), PSX:MEBL, MUFAP:Meezan Rozana">
             <Input {...register('ticker')} />
           </Field>
         </div>

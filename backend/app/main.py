@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -26,6 +27,8 @@ logger = logging.getLogger("capitalos")
 
 FX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
 FX_SYNC_STARTUP_DELAY_SECONDS = 60
+PRICE_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
+PRICE_SYNC_STARTUP_DELAY_SECONDS = 120  # offset from the FX loop's 60s
 
 
 def _run_fx_sync() -> None:
@@ -40,24 +43,44 @@ def _run_fx_sync() -> None:
         db.close()
 
 
-async def _fx_daily_loop() -> None:
-    await asyncio.sleep(FX_SYNC_STARTUP_DELAY_SECONDS)
+def _run_price_sync() -> None:
+    """Open a session and sync holding prices for every user (runs in a thread)."""
+    from app.core.db import SessionLocal
+    from app.services.price_sync import sync_all_users
+
+    db = SessionLocal()
+    try:
+        sync_all_users(db)
+    finally:
+        db.close()
+
+
+async def _daily_loop(
+    name: str, run: Callable[[], None], startup_delay: int, interval: int
+) -> None:
+    await asyncio.sleep(startup_delay)
     while True:
         try:
-            await asyncio.to_thread(_run_fx_sync)
+            await asyncio.to_thread(run)
         except Exception:  # noqa: BLE001 - keep the loop alive whatever happens
-            logger.exception("Daily FX sync run failed")
-        await asyncio.sleep(FX_SYNC_INTERVAL_SECONDS)
+            logger.exception("Daily %s sync run failed", name)
+        await asyncio.sleep(interval)
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    task: asyncio.Task | None = None
+    tasks: list[asyncio.Task] = []
     if settings.fx_auto_sync:
-        task = asyncio.create_task(_fx_daily_loop())
+        tasks.append(asyncio.create_task(_daily_loop(
+            "FX", _run_fx_sync, FX_SYNC_STARTUP_DELAY_SECONDS, FX_SYNC_INTERVAL_SECONDS)))
         logger.info("Daily FX auto-sync enabled")
+    if settings.price_auto_sync:
+        tasks.append(asyncio.create_task(_daily_loop(
+            "price", _run_price_sync,
+            PRICE_SYNC_STARTUP_DELAY_SECONDS, PRICE_SYNC_INTERVAL_SECONDS)))
+        logger.info("Daily price auto-sync enabled")
     yield
-    if task is not None:
+    for task in tasks:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task

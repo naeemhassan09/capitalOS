@@ -53,3 +53,22 @@ export function useAddValuation() {
     onSuccess: () => invalidate(qc),
   });
 }
+
+export interface PriceSyncResult {
+  updated: { asset_name: string; ticker: string; price: number; valuation: number }[];
+  skipped: string[];
+  errors: { name: string; error: string }[];
+}
+
+/** Fetch market prices server-side for holdings with a ticker + quantity. */
+export function useSyncPrices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<PriceSyncResult>('/holdings/sync-prices'),
+    onSuccess: () => {
+      invalidate(qc); // holdings + dashboard summary
+      qc.invalidateQueries({ queryKey: ['dashboard'] }); // cashflow / net-worth views
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}

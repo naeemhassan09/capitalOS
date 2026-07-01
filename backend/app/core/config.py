@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # Daily background sync of exchange rates from a free external source.
     fx_auto_sync: bool = Field(default=True)
 
+    # --- Investment prices ---
+    # Daily background sync of holding prices (PSX / MUFAP / stooq-Yahoo).
+    price_auto_sync: bool = Field(default=True)
+
     # --- Open Banking (feature-flagged off) ---
     open_banking_enabled: bool = Field(default=False)
     gocardless_bank_data_secret_id: str = Field(default="")

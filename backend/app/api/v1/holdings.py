@@ -20,10 +20,12 @@ from app.schemas.holding import (
     HoldingCreate,
     HoldingOut,
     HoldingUpdate,
+    PriceSyncResult,
     ValuationCreate,
     ValuationOut,
 )
 from app.services.audit import log_event
+from app.services.price_sync import sync_user_prices
 
 router = APIRouter(prefix="/holdings", tags=["holdings"])
 
@@ -66,6 +68,28 @@ def create_holding(
     db.commit()
     db.refresh(holding)
     return _to_out(holding)
+
+
+# NOTE: keep this static route registered before the /{holding_id} routes.
+@router.post("/sync-prices", response_model=PriceSyncResult)
+def sync_prices(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> PriceSyncResult:
+    """Fetch market prices for holdings that have a ticker and quantity.
+
+    Sources are resolved from the ticker convention (PSX:…, MUFAP:…, else a
+    generic stooq/Yahoo quote). Per-holding failures are reported, not fatal.
+    """
+    result = sync_user_prices(db, user)
+    log_event(db, action="holding.sync_prices", user_id=user.id, entity_type="holding",
+              request=request,
+              after={"updated": [u["ticker"] for u in result["updated"]],
+                     "skipped": len(result["skipped"]),
+                     "errors": len(result["errors"])})
+    db.commit()
+    return PriceSyncResult(**result)
 
 
 @router.get("/{holding_id}", response_model=HoldingOut)
