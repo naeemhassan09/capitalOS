@@ -57,6 +57,18 @@ def build_fingerprint(
 
 
 # ------------------------------------------------------------- rules engine
+def _amount_within(rule: CategorisationRule, txn: Transaction) -> bool:
+    """amount_min/amount_max act as extra bounds on ANY rule when set."""
+    lo = D(rule.amount_min) if rule.amount_min is not None else None
+    hi = D(rule.amount_max) if rule.amount_max is not None else None
+    if lo is None and hi is None:
+        return True
+    amt = D(txn.amount)
+    if lo is not None and amt < lo:
+        return False
+    return not (hi is not None and amt > hi)
+
+
 def _matches(rule: CategorisationRule, txn: Transaction) -> bool:
     field_map = {
         "description": txn.description or "",
@@ -64,14 +76,11 @@ def _matches(rule: CategorisationRule, txn: Transaction) -> bool:
         "merchant": txn.merchant or "",
         "counterparty": txn.counterparty or "",
     }
+    if not _amount_within(rule, txn):
+        return False
     op = rule.operator
     if op == "amount_range":
-        amt = D(txn.amount)
-        lo = D(rule.amount_min) if rule.amount_min is not None else None
-        hi = D(rule.amount_max) if rule.amount_max is not None else None
-        if lo is not None and amt < lo:
-            return False
-        return not (hi is not None and amt > hi)
+        return True  # bounds already checked above
 
     haystack = field_map.get(rule.match_field, "").lower()
     needle = (rule.match_value or "").lower()
